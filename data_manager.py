@@ -1,6 +1,8 @@
 # data_manager.py
 import pandas as pd
 import streamlit as st
+# 👇 引入資料庫存檔功能
+from database import save_order_to_db 
 
 # ==========================================
 # 資料讀取
@@ -23,62 +25,49 @@ def load_data():
     return pd.DataFrame(data)
 
 # ==========================================
-# Callback 函數：處理狀態變更 (新增數量邏輯)
+# Callback 函數
 # ==========================================
 def add_to_cart_callback(item):
-    """
-    商品點擊加入購物車時執行的 callback。
-    將商品加入 st.session_state.cart 字典，或增加數量。
-    """
     item_id = item['id']
     if item_id in st.session_state.cart:
         st.session_state.cart[item_id]['quantity'] += 1
         st.toast(f"✅ {item['name']} 數量增加！")
     else:
-        # 將 DataFrame Series 轉換為字典並初始化數量
         new_item = item.to_dict() if isinstance(item, pd.Series) else item
         new_item['quantity'] = 1
         st.session_state.cart[item_id] = new_item
         st.toast(f"✅ 已將 {item['name']} 加入購物車！")
 
 def update_quantity(item_id, change):
-    """
-    更新購物車中商品的數量 (+/-)。
-    """
     if item_id in st.session_state.cart:
         st.session_state.cart[item_id]['quantity'] += change
         if st.session_state.cart[item_id]['quantity'] <= 0:
             del st.session_state.cart[item_id]
-    # 手動重載側邊欄以反映變化
-     
 
 def clear_cart_callback():
-    """
-    清空購物車的 callback。
-    """
     st.session_state.cart = {}
-    
 
 def submit_order_callback(name, email, address):
     """
     結帳表單提交後執行的 callback。
     """
     if name and address:
-        # 計算總價和總數，適應新的購物車結構
-        current_total = sum(item['price'] * item['quantity'] for item in st.session_state.cart.values())
-        total_items = sum(item['quantity'] for item in st.session_state.cart.values())
+        # 1. 抓取目前登入的帳號 (如果沒登入就是None)
+        buyer_account = st.session_state.get('current_user')
 
-        order_info = {
-            "Name": name,
-            "Email": email,
-            "Total": current_total,
-            "Items_Count": total_items,
-            "Order_Details": str([f"{v['name']} x{v['quantity']}" for v in st.session_state.cart.values()])
-        }
-        st.session_state.orders.append(order_info)
+        # 2. 計算總金額
+        current_total = sum(item['price'] * item['quantity'] for item in st.session_state.cart.values())
+        
+        # 3. 整理商品清單文字
+        order_details_str = ", ".join([f"{v['name']} x{v['quantity']}" for v in st.session_state.cart.values()])
+
+        # 4. 【關鍵修改】直接寫入資料庫，而不是 session_state.orders
+        save_order_to_db(buyer_account, name, email, address, current_total, order_details_str)
+        
+        # 5. 清空購物車
         st.session_state.cart = {} 
-        st.success("🎉 訂單已送出！")
+        st.success("🎉 訂單已送出！(已存入資料庫)")
         st.balloons()
-        st.rerun()
+        # 這裡不需要 rerun，讓氣球特效跑一下
     else:
         st.error("請填寫完整資訊")
