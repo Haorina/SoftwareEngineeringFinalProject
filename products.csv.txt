@@ -1,7 +1,0 @@
-id,name,category,price,image
-1,高階機械鍵盤,3C周邊,3500,https://fakeimg.pl/300x200/?text=Keyboard
-2,電競無線滑鼠,3C周邊,1800,https://fakeimg.pl/300x200/?text=Mouse
-3,降噪耳機,影音設備,5200,https://fakeimg.pl/300x200/?text=Headset
-4,人體工學椅,辦公家具,8000,https://fakeimg.pl/300x200/?text=Chair
-5,Type-C集線器,3C周邊,900,https://fakeimg.pl/300x200/?text=Hub
-6,4K螢幕,影音設備,12000,https://fakeimg.pl/300x200/?text=Monitor
