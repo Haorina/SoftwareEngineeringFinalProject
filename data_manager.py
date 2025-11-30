@@ -18,6 +18,7 @@ def load_data():
         {"id": 6, "name": "4K螢幕", "category": "影音設備", "price": 12000, "image": "https://attach.mobile01.com/attach/202411/mobile01-457221a9759255cc1832ddffa7d8e2f9.jpg"},
         {"id": 7, "name": "音響", "category": "影音設備", "price": 6000, "image": "https://attach.mobile01.com/attach/202411/mobile01-457221a9759255cc1832ddffa7d8e2f9.jpg"},
         {"id": 8, "name": "麥克風", "category": "影音設備", "price": 3000, "image": "https://attach.mobile01.com/attach/202411/mobile01-457221a9759255cc1832ddffa7d8e2f9.jpg"},
+        {"id": 9, "name": "派大星", "category": "玩具", "price": 300, "image": "https://images.seeklogo.com/logo-png/32/1/patrick-star-logo-png_seeklogo-320105.png"},
     ]
     return pd.DataFrame(data)
 
