@@ -1,7 +1,8 @@
 # ui_components.py
 import streamlit as st
 from data_manager import add_to_cart_callback, update_quantity, clear_cart_callback, submit_order_callback
-from database import get_user_info 
+# 👇 引入所有需要的資料庫函式 (含新增商品)
+from database import get_user_info, get_all_orders, update_order_status, add_new_product
 
 # ==========================================
 # 介面渲染：美化 CSS
@@ -24,6 +25,7 @@ def apply_styles():
             transform: translateY(-2px);
             color: white !important;
         }
+        /* 側邊欄調整 */
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] { gap: 0 !important; }
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] [data-testid="column"] { padding: 0 !important; min-width: 0 !important; }
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] .stButton > button {
@@ -45,8 +47,7 @@ def apply_styles():
 # 介面渲染：商品展示
 # ==========================================
 def display_products(df):
-    st.title("🌿 Shop") 
-    st.markdown("---")
+    st.subheader("🛍️ 商店預覽 (Shop Preview)") 
     
     categories = ["全部"] + list(df['category'].unique())
     selected_cat = st.radio("分類篩選 (Category)", categories, horizontal=True)
@@ -60,7 +61,11 @@ def display_products(df):
     for i, (index, row) in enumerate(df.iterrows()):
         with cols[i % 3]:
             with st.container(border=True):
-                st.image(row['image'], use_container_width=True)
+                try:
+                    st.image(row['image'], use_container_width=True)
+                except:
+                    st.warning("圖片無法載入")
+                
                 st.subheader(row['name'])
                 c1, c2 = st.columns([1,1])
                 c1.caption(row['category'])
@@ -99,44 +104,30 @@ def display_cart():
         clear_cart_callback() 
 
 # ==========================================
-# 介面渲染：結帳區塊 (已修改：快速結帳)
+# 介面渲染：結帳區塊
 # ==========================================
 def checkout_section():
-    """
-    展示結帳表單。
-    邏輯：
-    1. 若未登入 -> 顯示警告，隱藏表單。
-    2. 若已登入且資料完整 -> 顯示確認資訊 + 一鍵下單按鈕 (不顯示輸入框)。
-    3. 若已登入但資料缺漏 -> 顯示輸入框讓使用者補填。
-    """
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     
     if st.session_state.cart:
-        # 1. 強制登入檢查
         if not st.session_state.get('current_user'):
             st.sidebar.warning("🔒 請先登入會員才能結帳")
             return 
 
         with st.sidebar.expander("💳 結帳確認 (Checkout)", expanded=True):
-            
-            # 嘗試抓取資料
             user_info = get_user_info(st.session_state.current_user)
             saved_name = user_info.get('real_name') if user_info else ""
             saved_email = user_info.get('email') if user_info else ""
             saved_addr = user_info.get('address') if user_info else ""
 
-            # 2. 如果資料完整 -> 顯示快速結帳介面 (無輸入框)
             if saved_name and saved_addr:
                 st.info("📦 將配送至以下地址：")
                 st.markdown(f"**收件人：** {saved_name}")
                 st.markdown(f"**Email：** {saved_email}")
                 st.markdown(f"**地址：** {saved_addr}")
                 
-                # 直接顯示按鈕
                 if st.button("🚀 確認下單 (Place Order)", use_container_width=True):
                     submit_order_callback(saved_name, saved_email, saved_addr)
-            
-            # 3. 資料不完整 -> 顯示原本的表單讓使用者補填
             else:
                 st.warning("⚠️ 您的會員資料不完整，請手動填寫")
                 with st.form("checkout_form"):
@@ -147,3 +138,57 @@ def checkout_section():
                     submitted = st.form_submit_button("確認下單")
                     if submitted:
                         submit_order_callback(name, email, address)
+
+# ==========================================
+# 介面渲染：管理員後台 (整合式)
+# ==========================================
+def admin_dashboard():
+    st.title("🔧 管理員後台 (Admin Dashboard)")
+    
+    # 1. 顯示訂單列表
+    df_orders = get_all_orders()
+    if not df_orders.empty:
+        total_revenue = df_orders['total_amount'].sum()
+        kpi1, kpi2 = st.columns(2)
+        kpi1.metric("總營收", f"NT$ {total_revenue:,}")
+        kpi2.metric("總訂單數", len(df_orders))
+    else:
+        st.info("目前沒有任何訂單")
+
+    st.markdown("---")
+
+    # 2. 新增上架商品 (使用 Expander)
+    with st.expander("➕ 新增上架商品 (Add New Product)", expanded=False):
+        with st.form("add_product_form"):
+            st.caption("輸入商品資訊並上架")
+            new_name = st.text_input("商品名稱 (Product Name)")
+            c1, c2 = st.columns(2)
+            with c1:
+                new_category = st.selectbox("分類", ["3C周邊", "影音設備", "辦公家具", "玩具", "其他"])
+            with c2:
+                new_price = st.number_input("價格", min_value=1, step=100)
+            new_image = st.text_input("圖片網址 (Image URL)")
+            
+            if st.form_submit_button("確認上架"):
+                if new_name and new_price and new_image:
+                    if add_new_product(new_name, new_category, int(new_price), new_image):
+                        st.success(f"✅ 上架成功：{new_name}")
+                    else:
+                        st.error("❌ 上架失敗")
+                else:
+                    st.error("⚠️ 請填寫完整")
+
+    st.markdown("### 📋 訂單管理列表")
+    if not df_orders.empty:
+        for index, row in df_orders.iterrows():
+            with st.expander(f"訂單 #{row['id']} - {row['customer_name']}"):
+                st.write(f"商品：{row['items_summary']}")
+                st.caption(f"地址：{row['customer_address']}")
+                
+                new_status = st.selectbox("狀態", ["處理中", "已出貨", "已完成", "取消"], 
+                                        index=["處理中", "已出貨", "已完成", "取消"].index(row['status']) if row['status'] in ["處理中", "已出貨", "已完成", "取消"] else 0,
+                                        key=f"st_{row['id']}")
+                if st.button("更新狀態", key=f"btn_{row['id']}"):
+                    update_order_status(row['id'], new_status)
+                    st.success("已更新")
+                    st.rerun()
